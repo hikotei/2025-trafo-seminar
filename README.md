@@ -1,2 +1,2 @@
-# 2024_12-transformer-from-scratch
+# Mathe Seminar
 2024_12 GPT from scratch
