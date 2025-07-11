@@ -8,6 +8,8 @@ This repository contains code and visualizations for empirically replicating the
 *Borjan Geshkovski, Cyril Letrouit, Yury Polyanskiy, Philippe Rigollet*  
 [arXiv:2312.10794](https://arxiv.org/abs/2312.10794)
 
+**Authors' Code:** The `trafo-rotf-main/` directory contains example code from the authors, which can also be found on [GitHub](https://github.com/borjanG/2023-transformers-rotf/)
+
 The focus is on empirical reproductions of key theoretical behaviors such as clustering, metastability, and the Wasserstein flow interpretation of self-attention dynamics.
 
 ## 🎯 Project Goals
@@ -71,11 +73,3 @@ The dataset is particularly valuable for:
 ## ⚙️ Setup & Installation
 
 ...
-
-## 📚 Paper Reference
-
-The work in this repository is largely based on and aims to replicate findings from:
-
-Geshkovski, B., Letrouit, C., Polyanskiy, Y., & Rigollet, P. (2023). *A mathematical perspective on Transformers*. arXiv preprint arXiv:2312.10794.
-*   **arXiv Link:** [https://arxiv.org/abs/2312.10794](https://arxiv.org/abs/2312.10794)
-*   **Authors' Code:** The `trafo-rotf-main/` directory contains example code from the authors, which can also be found on [GitHub](https://github.com/borjanG/2023-transformers-rotf) (if this is the correct link, otherwise adjust).

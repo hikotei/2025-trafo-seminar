@@ -1,18 +1,20 @@
-import argparse
-import torch
+# Standard library imports
+import os
 import gc
-import timeit
-import numpy as np
-import pickle
-import datetime
 import sys
 import time
-import os
-import matplotlib.pyplot as plt
-import tqdm
 import math
+import pickle
 import random
 import string
+import argparse
+import datetime
+
+# Third-party imports
+import tqdm
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
 
 # Check for Metal availability
 if torch.backends.mps.is_available():
@@ -24,7 +26,53 @@ else:
 
 
 class simu_xform:
+    """
+    This class is a simulation of the transformer self-attention dynamics.
+    xform is short for transformer.
+
+    contains the following class methods:
+        - __init__: initialize the simulation
+        - generate_KQV: generate the key-query-value matrices
+        - update_IP: update the inner product matrix
+        - check_stats: check the statistics of the simulation
+        - compute_hist1: compute the histogram of the inner product matrix
+        - compute_hist_ensemble: compute the histogram of the inner product matrix for a specific particle pair
+        - compute_hist_all: compute the histogram of the inner product matrix for all particle pairs
+        - count_clusters: count the number of clusters in the simulation
+        - step_1: execute one time step of the simulation
+
+    later on objects of this class will be used
+    to run the simulation for a range of beta values.
+    using the methods :
+        - do_single_beta: run the simulation for a single beta value
+        - do_results: run the simulation for a range of beta values
+        - plot_pickle: plot the results of the simulation from a pickle file
+    """
+
     def __init__(self, args, beta, V=None, BF=None):
+        """
+        Initialize the transformer self-attention particle system simulation.
+
+        Models tokens as particles on a high-dimensional sphere that interact through
+        self-attention dynamics. Each particle represents a token embedding, and the
+        system evolves according to attention-weighted updates.
+
+        Args:
+            args: Configuration object containing simulation parameters
+                - batch: Number of independent systems to simulate in parallel
+                - ntokens: Number of tokens/particles per system
+                - dmodel: Dimensionality of token embeddings (sphere dimension)
+                - step: Time step size for dynamics
+                - use_softmax: Whether to use softmax normalization in attention
+            beta: Temperature parameter controlling attention sharpness
+                - Higher beta = sharper attention, more clustering
+                - Lower beta = diffuse attention, less clustering
+            V: Optional pre-computed value matrix (for reusing across simulations)
+            BF: Optional pre-computed bilinear form matrix (key-query interaction)
+
+        The system tracks particle positions (M), inner products (IP), softmax weights (SM),
+        and evolves particles according to self-attention dynamics on the sphere.
+        """
         batch, ntokens, dmodel = args.batch, args.ntokens, args.dmodel
         self.args = args
         self.beta = beta
@@ -32,6 +80,11 @@ class simu_xform:
         if (not args.use_softmax) and (not args.rawstep):
             max_val = max(np.sqrt(beta) * np.exp(beta - 1 / 2), 1)
             eta = args.step / max_val
+
+            # cursor suggestion :
+            # max_val = torch.max(torch.sqrt(beta) * torch.exp(beta - 1 / 2), torch.tensor(1.0))
+            # eta = args.step / max_val.item()
+
             print(f"Corrected step = {eta}")
         else:
             eta = args.step
@@ -55,6 +108,22 @@ class simu_xform:
         torch.nn.functional.normalize(self.M2, dim=2, out=self.M)
 
     def generate_KQV(self):
+        """
+        Generate key-query-value matrices that define the attention mechanism.
+
+        Creates the bilinear form (BF) for key-query interactions and value matrix (V)
+        that determine how particles influence each other. Different modes create:
+        - Identity matrices (standard case)
+        - Random Gaussian matrices (introduces randomness)
+        - Gaussian Orthogonal Ensemble (GOE) matrices (structured randomness)
+        - Wigner matrices (symmetric random matrices)
+
+        The BF matrix determines the attention pattern geometry, while V matrix
+        controls how attended information is combined. These matrices can be:
+        - Regenerated each step (simulating different layers)
+        - Fixed per beta (temperature-dependent but layer-independent)
+        - Fixed globally (same across all conditions)
+        """
         args = self.args
         batch, ntokens, dmodel = args.batch, args.ntokens, args.dmodel
         # In noanneal=2 mode we do not touch BF
@@ -126,10 +195,37 @@ class simu_xform:
 
     # Compute inner products from particle positions M
     def update_IP(self):
+        """
+        Update the inner product matrix between all pairs of particles.
+
+        Computes the dot products between all token embeddings, which determines
+        the similarity structure of the system. Inner products close to 1 indicate
+        particles that are nearly aligned (clustered), while values near 0 indicate
+        orthogonal particles. This matrix is central to measuring clustering behavior.
+
+        Updates self.IP with shape (batch, ntokens, ntokens) where IP[i,j,k] is the
+        inner product between particles j and k in system i.
+        """
         torch.matmul(self.M, self.M.transpose(1, 2), out=self.IP)
 
     # Compute density at zero and average number of clusters.
     def check_stats(self):
+        """
+        Analyze the clustering statistics of the particle system.
+
+        Computes key metrics that quantify how much clustering has occurred:
+        - For plotdim=True: Counts the effective dimensionality by looking at
+          eigenvalues of the inner product matrix (lower dim = more clustering)
+        - For plotdim=False: Counts fraction of particle pairs with inner product > 0.999
+          (high fraction = many particles are nearly aligned/clustered)
+
+        Returns:
+            dens: Density measure - either effective dimension or clustering fraction
+            median_clust: Median number of clusters across all systems (if computed)
+
+        This provides the main observable for studying phase transitions in attention
+        dynamics as temperature (beta) varies.
+        """
         self.update_IP()
         batch = self.args.batch
         if self.args.plotdim:
@@ -172,6 +268,21 @@ class simu_xform:
         return dens, median_clust
 
     def compute_hist1(self, idx=0):
+        """
+        Compute detailed clustering statistics for a single system.
+
+        Args:
+            idx: Index of the system to analyze (default: 0)
+
+        Returns:
+            dens: Histogram density of inner products
+            bins: Histogram bin edges
+            cluster_sizes: Sizes of identified clusters
+
+        Provides fine-grained analysis of the clustering structure in one system,
+        including the distribution of inner products and cluster size information.
+        Useful for detailed inspection of clustering patterns.
+        """
         dens, bins = torch.histogram(
             self.IP[idx, :, :].flatten().cpu(), 250, density=True
         )
@@ -185,6 +296,20 @@ class simu_xform:
 
     # Return histogram of inner products of (X_1,X_2) across different systems
     def compute_hist_ensemble(self):
+        """
+        Compute histogram of inner products for specific particle pairs across ensemble.
+
+        Focuses on correlations between consecutive particle pairs (X_1,X_2), (X_3,X_4), etc.
+        across all systems in the ensemble. This provides insight into typical pairwise
+        clustering behavior without including all possible pairs.
+
+        Returns:
+            dens: Histogram density of selected inner products
+            bins: Histogram bin edges
+
+        Useful for studying ensemble-averaged clustering statistics while focusing on
+        natural particle pairings.
+        """
         ntokens = self.args.ntokens
         pairs = [self.IP[:, x, x + 1].flatten() for x in range(0, ntokens, 2)]
         all_corr = torch.cat(pairs).cpu()
@@ -193,10 +318,31 @@ class simu_xform:
 
     # Finally, return giant histo of everything
     def compute_hist_all(self):
+        """
+        Compute histogram of all inner products across all systems.
+
+        Returns:
+            dens: Histogram density of all inner products
+            bins: Histogram bin edges
+
+        Provides the most comprehensive view of clustering by including every pairwise
+        inner product across all systems. Shows the full distribution of particle
+        similarities in the ensemble.
+        """
         dens, bins = torch.histogram(self.IP.flatten().cpu(), 500, density=True)
         return dens, bins
 
     def count_clusters(self):
+        """
+        Count the number of distinct clusters in each system.
+
+        Returns:
+            Array of cluster counts for each system in the batch
+
+        Determines how many separate groups of nearly-aligned particles exist in each
+        system by analyzing the rank of the thresholded inner product matrix.
+        Lower cluster counts indicate more particles have merged into fewer groups.
+        """
         batch, ntokens = self.args.batch, self.args.ntokens
         list_clust = []
         for i in range(batch):
@@ -210,6 +356,25 @@ class simu_xform:
         return np.asarray(list_clust)
 
     def step_1(self, time):
+        """
+        Execute one time step of the self-attention dynamics.
+
+        Args:
+            time: Current simulation time
+
+        Returns:
+            Updated time (time + step_size)
+
+        Implements the core dynamics of transformer self-attention as a particle system:
+        1. Apply bilinear form (key-query interaction) to particles
+        2. Compute attention weights via softmax or normalized exponential
+        3. Apply attention-weighted combination (value transformation)
+        4. Update particle positions while maintaining normalization on sphere
+
+        This is the heart of the simulation, where particles interact through attention
+        and evolve according to the resulting forces. Higher beta leads to sharper
+        attention and stronger clustering forces.
+        """
         # If you want non-identity bilinear form keep at True
         if self.args.randomKQ > 0:
             torch.matmul(self.M, self.BF, out=self.M2)
@@ -260,6 +425,24 @@ class simu_xform:
 
 
 def do_single_beta(args, beta_idx, ret_dict, V=None, BF=None):
+    """
+    Run the complete simulation for a single temperature (beta) value.
+
+    Args:
+        args: Simulation configuration parameters
+        beta_idx: Index of the beta value to simulate
+        ret_dict: Dictionary containing simulation setup (beta values, time points, storage)
+        V: Optional pre-computed value matrix
+        BF: Optional pre-computed bilinear form matrix
+
+    Returns:
+        Updated ret_dict with simulation results
+
+    Executes the full time evolution for one temperature, recording clustering statistics
+    at specified time checkpoints. This captures the dynamics of how clustering evolves
+    over time for a fixed attention sharpness (beta), which is crucial for understanding
+    the phase diagram of the system.
+    """
     beta = ret_dict["betas_list"][beta_idx]
     s = simu_xform(args, beta, V=V, BF=BF)
     cur_ckpt = 0
@@ -303,6 +486,25 @@ def do_single_beta(args, beta_idx, ret_dict, V=None, BF=None):
 
 
 def do_results(args):
+    """
+    Execute the complete phase diagram simulation across all temperature values.
+
+    Args:
+        args: Complete simulation configuration containing all parameters
+
+    Returns:
+        Dictionary containing full simulation results including:
+        - beta values (temperature range)
+        - time points
+        - density tensor (clustering measure vs beta and time)
+        - cluster tensor (cluster count vs beta and time)
+
+    This is the main simulation driver that maps out the phase diagram of transformer
+    self-attention dynamics. It explores how clustering behavior changes as a function
+    of both temperature (beta) and time, revealing phase transitions between different
+    clustering regimes. The results show where and when tokens begin to cluster together
+    in the attention mechanism.
+    """
     # Change default tensor type to float32 for MPS compatibility
     torch.set_default_dtype(torch.float32)
     x = torch.zeros(3, 3)
@@ -355,6 +557,24 @@ def do_results(args):
 
 
 def plot_pickle(fname):
+    """
+    Create phase diagram plots from saved simulation results.
+
+    Args:
+        fname: Path to pickle file containing simulation results
+
+    Generates publication-quality phase diagrams showing clustering behavior as a function
+    of temperature (beta) and time. Creates both linear and logarithmic scale plots that
+    reveal:
+    - Phase boundaries between different clustering regimes
+    - Critical temperatures where clustering begins
+    - Time scales for cluster formation
+    - Overall phase diagram structure
+
+    The plots use color maps to show clustering density, with different colors indicating
+    different levels of clustering. This visualizes the "phase transitions" in transformer
+    attention dynamics.
+    """
     with open(fname, "rb") as f:
         ret = pickle.load(f)
 
@@ -543,6 +763,13 @@ if __name__ == "__main__":
     }
     salt = "".join(random.choices(string.ascii_letters + string.digits, k=3))
     fname_prefix = datetime.datetime.now().strftime("ds_%Y_%m_%d-%H_%M_" + salt)
+
+    # Create directory for output files
+    output_dir = fname_prefix
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Update paths to include directory
+    fname_prefix = os.path.join(output_dir, fname_prefix)
     args.fname_prefix = fname_prefix
     print(f"Using {fname_prefix}.log for stdout")
     start_time = time.time()
