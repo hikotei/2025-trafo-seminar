@@ -1,4 +1,4 @@
-# Mathematical Perspectives on Transformers: Replications and Explorations 🔬
+# A Mathematical Perspective on Transformers: Replication and Exploration
 
 ## 📌 Overview
 
