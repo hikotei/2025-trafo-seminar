@@ -237,6 +237,8 @@ class simu_xform:
                 dens = 0
             else:
                 # print('[debug] eigv = ', eigv);
+                # NOTE that this is the choice of delta = 0.001
+                # such that we classify vectors with IP > 0.999 = 1-delta as clustered
                 dens = (eigv > 0.001).flatten().sum() / batch
         else:
             # Earlier versions had a bug where we also counted i=j particles into the sum.
@@ -388,7 +390,7 @@ class simu_xform:
         # torch.matmul(self.M,self.M.transpose(1,2), out=self.IP);
 
         # Compute softmax
-        if args.use_softmax:
+        if self.args.use_softmax:
             # Old, numerically unstable implementation
             # torch.exp(self.SM, out=self.SM);
             # summed = torch.sum(self.SM, dim=2, keepdim=True);
@@ -543,9 +545,7 @@ def do_results(args):
         ret_dict = do_single_beta(args, i, ret_dict, V=Vsave, BF=BFsave)
         time1 = time.time()
         est_time = float(time1 - time_st) / (i + 1) * (len(betas_list) - i - 1)
-        if False:
-            with open(fname_prefix + "_tmp.pkl", "wb") as f:
-                pickle.dump(ret_dict, f)
+        
         print(
             f"[END] Step {i}. beta = {beta:.3f}. End time = {str(datetime.datetime.now())}."
         )
@@ -675,112 +675,112 @@ def plot_pickle(fname):
 
 # Return histogram of inner products in the 0-th system
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="dens_sweep")
-    # Add device detection at the start
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    print(f"Using {device} backend")
-    parser.add_argument(
-        "--dmodel", type=int, default=2, help="dimensionality of each token"
-    )
-    parser.add_argument("--ntokens", type=int, default=32, help="number of tokens")
-    parser.add_argument("--batch", type=int, default=2048, help="number of batches")
-    parser.add_argument("--betamin", type=float, default=0.1, help="lowest beta")
-    parser.add_argument("--betamax", type=float, default=9, help="largest beta")
-    parser.add_argument("--betas", type=int, default=90, help="total betas")
-    # Good defaults:
-    # maxtime=30, softmax=True
-    # maxtime=1, softmax=False
-    parser.add_argument("--maxtime", type=float, default=0, help="Termination time")
-    parser.add_argument(
-        "--step",
-        type=float,
-        default=0.1,
-        help="Time step (for softmax=False it will be renormalized)",
-    )
-    parser.add_argument(
-        "--use_softmax",
-        action="store_true",
-        help="Use softmax normalization (o/w use ntokens)",
-    )
-    parser.add_argument(
-        "--randomV",
-        type=int,
-        default=0,
-        nargs="?",
-        const=1,
-        help="V is identity (default), random gsn V (1), +B (2), -B (3)",
-    )
-    parser.add_argument(
-        "--randomKQ",
-        type=int,
-        default=0,
-        nargs="?",
-        const=1,
-        help="Generate random gsn K,Q (1), or Wigner K^T Q (2)",
-    )
-    parser.add_argument(
-        "--cluster_sizes",
-        action="store_true",
-        help="Generate random gsn K,Q (o/w identity)",
-    )
-    parser.add_argument(
-        "--disable_tqdm",
-        action="store_true",
-        help="Disable TQDM progress bar (for parallel runs)",
-    )
-    parser.add_argument(
-        "--noanneal",
-        type=int,
-        default=0,
-        help="Generate only one K,Q,V per value of beta (1) or per entire run (2)",
-    )
-    parser.add_argument(
-        "--rawstep",
-        action="store_true",
-        help="For non-softmax, do not normalize the step (fast, but less accurate simu)",
-    )
-    parser.add_argument(
-        "--regen_period",
-        type=float,
-        default=0,
-        help="If non-zero regenerates KQV every <arg> time simulating different layers (default=0)",
-    )
-    parser.add_argument(
-        "--plotdim",
-        action="store_true",
-        help="Compute dim of span of tokens instead of prob of clustering",
-    )
-    args = parser.parse_args()
-    if args.maxtime == 0.0:
-        if args.use_softmax:
-            args.maxtime = 30.0
-        else:
-            args.maxtime = 1.0
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description="dens_sweep")
+#     # Add device detection at the start
+#     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+#     print(f"Using {device} backend")
+#     parser.add_argument(
+#         "--dmodel", type=int, default=2, help="dimensionality of each token"
+#     )
+#     parser.add_argument("--ntokens", type=int, default=32, help="number of tokens")
+#     parser.add_argument("--batch", type=int, default=2048, help="number of batches")
+#     parser.add_argument("--betamin", type=float, default=0.1, help="lowest beta")
+#     parser.add_argument("--betamax", type=float, default=9, help="largest beta")
+#     parser.add_argument("--betas", type=int, default=90, help="total betas")
+#     # Good defaults:
+#     # maxtime=30, softmax=True
+#     # maxtime=1, softmax=False
+#     parser.add_argument("--maxtime", type=float, default=0, help="Termination time")
+#     parser.add_argument(
+#         "--step",
+#         type=float,
+#         default=0.1,
+#         help="Time step (for softmax=False it will be renormalized)",
+#     )
+#     parser.add_argument(
+#         "--use_softmax",
+#         action="store_true",
+#         help="Use softmax normalization (o/w use ntokens)",
+#     )
+#     parser.add_argument(
+#         "--randomV",
+#         type=int,
+#         default=0,
+#         nargs="?",
+#         const=1,
+#         help="V is identity (default), random gsn V (1), +B (2), -B (3)",
+#     )
+#     parser.add_argument(
+#         "--randomKQ",
+#         type=int,
+#         default=0,
+#         nargs="?",
+#         const=1,
+#         help="Generate random gsn K,Q (1), or Wigner K^T Q (2)",
+#     )
+#     parser.add_argument(
+#         "--cluster_sizes",
+#         action="store_true",
+#         help="Generate random gsn K,Q (o/w identity)",
+#     )
+#     parser.add_argument(
+#         "--disable_tqdm",
+#         action="store_true",
+#         help="Disable TQDM progress bar (for parallel runs)",
+#     )
+#     parser.add_argument(
+#         "--noanneal",
+#         type=int,
+#         default=0,
+#         help="Generate only one K,Q,V per value of beta (1) or per entire run (2)",
+#     )
+#     parser.add_argument(
+#         "--rawstep",
+#         action="store_true",
+#         help="For non-softmax, do not normalize the step (fast, but less accurate simu)",
+#     )
+#     parser.add_argument(
+#         "--regen_period",
+#         type=float,
+#         default=0,
+#         help="If non-zero regenerates KQV every <arg> time simulating different layers (default=0)",
+#     )
+#     parser.add_argument(
+#         "--plotdim",
+#         action="store_true",
+#         help="Compute dim of span of tokens instead of prob of clustering",
+#     )
+#     args = parser.parse_args()
+#     if args.maxtime == 0.0:
+#         if args.use_softmax:
+#             args.maxtime = 30.0
+#         else:
+#             args.maxtime = 1.0
 
-    outdict = {
-        "args": args,
-    }
-    salt = "".join(random.choices(string.ascii_letters + string.digits, k=3))
-    fname_prefix = datetime.datetime.now().strftime("ds_%Y_%m_%d-%H_%M_" + salt)
+#     outdict = {
+#         "args": args,
+#     }
+#     salt = "".join(random.choices(string.ascii_letters + string.digits, k=3))
+#     fname_prefix = datetime.datetime.now().strftime("ds_%Y_%m_%d-%H_%M_" + salt)
 
-    # Create directory for output files
-    output_dir = fname_prefix
-    os.makedirs(output_dir, exist_ok=True)
+#     # Create directory for output files
+#     output_dir = fname_prefix
+#     os.makedirs(output_dir, exist_ok=True)
 
-    # Update paths to include directory
-    fname_prefix = os.path.join(output_dir, fname_prefix)
-    args.fname_prefix = fname_prefix
-    print(f"Using {fname_prefix}.log for stdout")
-    start_time = time.time()
+#     # Update paths to include directory
+#     fname_prefix = os.path.join(output_dir, fname_prefix)
+#     args.fname_prefix = fname_prefix
+#     print(f"Using {fname_prefix}.log for stdout")
+#     start_time = time.time()
 
-    with open(fname_prefix + ".log", "wt") as sys.stdout:
-        print("Using the following settings:\n", args)
-        main_res = do_results(args)
-        outdict.update(main_res)
-        with open(fname_prefix + ".pkl", "wb") as f:
-            pickle.dump(outdict, f)
+#     with open(fname_prefix + ".log", "wt") as sys.stdout:
+#         print("Using the following settings:\n", args)
+#         main_res = do_results(args)
+#         outdict.update(main_res)
+#         with open(fname_prefix + ".pkl", "wb") as f:
+#             pickle.dump(outdict, f)
 
-        plot_pickle(fname_prefix + ".pkl")
-        end_time = time.time()
-        print(f"Total time: {(end_time - start_time) / 60:.1f} min")
+#         plot_pickle(fname_prefix + ".pkl")
+#         end_time = time.time()
+#         print(f"Total time: {(end_time - start_time) / 60:.1f} min")

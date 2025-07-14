@@ -1,0 +1,19 @@
+{
+    "dmodel": 32,
+    "ntokens": 32,
+    "batch": 2048,
+    "betamin": 0.1,
+    "betamax": 9.0,
+    "betas": 50,
+    "maxtime": 30.0,
+    "step": 0.1,
+    "use_softmax": true,
+    "randomV": 0,
+    "randomKQ": 0,
+    "cluster_sizes": false,
+    "disable_tqdm": false,
+    "noanneal": 0,
+    "rawstep": false,
+    "regen_period": 0.0,
+    "plotdim": false
+}
