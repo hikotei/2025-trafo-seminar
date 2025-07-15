@@ -1,14 +1,12 @@
-# Mathematical Perspectives on Transformers: Replications and Explorations 🔬
+# A Mathematical Perspective on Transformers: Replication and Exploration
 
 ## 📌 Overview
 
-This repository contains code and visualizations for empirically replicating the mathematical insights and results from:
+This repository contains code and visualizations for empirically replicating the mathematical insights and results from: 
 
-**"A Mathematical Perspective on Transformers"**  
-*Borjan Geshkovski, Cyril Letrouit, Yury Polyanskiy, Philippe Rigollet*  
-[arXiv:2312.10794](https://arxiv.org/abs/2312.10794)
+**Borjan Geshkovski, Cyril Letrouit, Yury Polyanskiy, Philippe Rigollet** — ["A Mathematical Perspective on Transformers"](https://arxiv.org/abs/2312.10794)
 
-**Authors' Code:** The `trafo-rotf-main/` directory contains example code from the authors, which can also be found on [GitHub](https://github.com/borjanG/2023-transformers-rotf/)
+The `trafo-rotf-main/` directory contains adapted example code from the [authors' code](https://github.com/borjanG/2023-transformers-rotf/).
 
 The focus is on empirical reproductions of key theoretical behaviors such as clustering, metastability, and the Wasserstein flow interpretation of self-attention dynamics.
 
