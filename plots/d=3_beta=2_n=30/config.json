@@ -1,0 +1,9 @@
+{
+  "d": 3,
+  "beta": 2,
+  "n": 30,
+  "dt": 0.01,
+  "steps": 1001,
+  "seed": 1310311,
+  "antipodal_pair": false
+}

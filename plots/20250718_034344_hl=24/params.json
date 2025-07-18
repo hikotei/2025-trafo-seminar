@@ -1,0 +1,7 @@
+{
+    "min_words": 300,
+    "max_words": 500,
+    "drop_diagonal": false,
+    "n_hidden_layers": 24,
+    "n_attention_heads": 1
+}

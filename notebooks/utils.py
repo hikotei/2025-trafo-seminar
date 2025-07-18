@@ -47,6 +47,10 @@ class ParticleSimulation:
         with open(os.path.join(self.save_dir, "config.json"), "w") as f:
             json.dump(config, f, indent=2)
 
+    def _get_seed_suffix(self):
+        """Return seed suffix for filenames if seed is not 0."""
+        return f"_seed={self.seed}" if self.seed != 0 else ""
+
     def compute_trajectory(self):
         if self.d < 2:
             raise ValueError("Dimension d must be >= 2.")
@@ -182,6 +186,7 @@ class ParticleSimulation:
             if fname is None:
                 extra_info = f"_force2d={force_2d}" if force_2d else ""
                 extra_info += f"_drop_title={drop_title}" if drop_title else ""
+                extra_info += self._get_seed_suffix()
                 fname = f"step={step}_d={self.d}_beta={self.beta}_n={self.n}_steps={self.steps}{extra_info}.pdf"
             plt.tight_layout()
             plt.savefig(os.path.join(self.save_dir, fname))
@@ -232,6 +237,7 @@ class ParticleSimulation:
         if save:
             if fname is None:
                 extra_info = f"_force2d={force_2d}" if force_2d else ""
+                extra_info += self._get_seed_suffix()
                 fname = f"progression_d={self.d}_beta={self.beta}_n={self.n}_steps={self.steps}{extra_info}.pdf"
             plt.savefig(os.path.join(self.save_dir, fname), bbox_inches="tight")
 
@@ -243,6 +249,7 @@ class ParticleSimulation:
 
         if fname is None:
             extra_info = f"_force2d={force_2d}" if force_2d else ""
+            extra_info += self._get_seed_suffix()
             fname = f"anim_d={self.d}_beta={self.beta}_n={self.n}_steps={self.steps}{extra_info}.mp4"
         filepath = os.path.join(self.save_dir, fname)
 
